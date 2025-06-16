@@ -25,7 +25,6 @@
         <thead>
             <tr>
                 <th>No</th>
-                <th>ID Pemasok</th>
                 <th>Nama</th>
                 <th>Kontak</th>
                 <th>Total Pesanan</th>
@@ -36,7 +35,6 @@
         @foreach($pemasoks as $pemasok)
             <tr>
                 <td>{{ $pemasok->nomor }}</td>
-                <td>{{ $pemasok->id_pemasok }}</td>
                 <td>{{ $pemasok->nama }}</td>
                 <td>{{ $pemasok->kontak }}</td>
                 <td>{{ $pemasok->total_pesanan }}</td>

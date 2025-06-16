@@ -25,7 +25,6 @@
         <thead>
             <tr>
                 <th>No</th>
-                <th>ID Kerusakan</th>
                 <th>Produk</th>
                 <th>Jumlah</th>
                 <th>Alasan</th>
@@ -36,7 +35,6 @@
         @foreach($cacatProduks as $item)
             <tr>
                 <td>{{ $item->nomor }}</td>
-                <td>{{ $item->id_kerusakan }}</td>
                 <td>{{ $item->produk_nama }}</td>
                 <td>{{ $item->jumlah }}</td>
                 <td>{{ $item->alasan }}</td>

@@ -11,10 +11,7 @@ use App\Models\CacatProduk;
 use App\Models\Pemasok;
 use App\Models\PembelianProduk;
 use App\Models\Produk;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use Barryvdh\DomPDF\Facade\Pdf; // Tambahkan ini di atas
+use Barryvdh\DomPDF\Facade\Pdf;
 
 
 class LaporanController extends Controller

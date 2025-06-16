@@ -25,7 +25,6 @@
         <thead>
             <tr>
                 <th>No</th>
-                <th>ID Pesanan</th>
                 <th>Pelanggan</th>
                 <th>Metode Pembayaran</th>
                 <th>Produk</th>
@@ -40,7 +39,6 @@
         @foreach($pesanans as $pesanan)
             <tr>
                 <td>{{ $loop->iteration }}</td>
-                <td>{{ $pesanan->pesanan_id }}</td>
                 <td>
                     @if($pesanan->pelanggan)
                         {{ $pesanan->pelanggan->nama_pelanggan }} ({{ $pesanan->pelanggan->kode_pelanggan }})

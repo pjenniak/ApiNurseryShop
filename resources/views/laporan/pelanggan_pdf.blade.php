@@ -25,7 +25,6 @@
         <thead>
             <tr>
                 <th>No</th>
-                <th>ID Pelanggan</th>
                 <th>Nama</th>
                 <th>Tipe</th>
                 <th>Kontak</th>
@@ -37,7 +36,6 @@
         @foreach($pelanggans as $pelanggan)
             <tr>
                 <td>{{ $pelanggan->nomor }}</td>
-                <td>{{ $pelanggan->id_pelanggan }}</td>
                 <td>{{ $pelanggan->nama }}</td>
                 <td>{{ $pelanggan->tipe }}</td>
                 <td>{{ $pelanggan->kontak }}</td>

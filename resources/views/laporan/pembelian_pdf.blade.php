@@ -25,7 +25,6 @@
         <thead>
             <tr>
                 <th>No</th>
-                <th>ID Pembelian</th>
                 <th>Produk</th>
                 <th>Pemasok</th>
                 <th>Jumlah</th>
@@ -39,7 +38,6 @@
         @foreach($pembelianProduks as $item)
             <tr>
                 <td>{{ $item->nomor }}</td>
-                <td>{{ $item->pembelian_produk_id }}</td>
                 <td>{{ $item->produk_nama }}</td>
                 <td>{{ $item->pemasok_nama }}</td>
                 <td>{{ $item->jumlah }}</td>

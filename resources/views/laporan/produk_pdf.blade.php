@@ -25,7 +25,6 @@
         <thead>
             <tr>
                 <th>No</th>
-                <th>ID Produk</th>
                 <th>Nama</th>
                 <th>Kategori</th>
                 <th>Harga</th>
@@ -42,7 +41,6 @@
         @foreach($produks as $produk)
             <tr>
                 <td>{{ $produk->nomor }}</td>
-                <td>{{ $produk->produk_id }}</td>
                 <td>{{ $produk->nama_produk }}</td>
                 <td>{{ $produk->kategori }}</td>
                 <td>{{ $produk->harga }}</td>
