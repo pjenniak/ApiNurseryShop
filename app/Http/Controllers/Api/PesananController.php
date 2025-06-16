@@ -518,13 +518,13 @@ class PesananController extends Controller
             'id' => 'required|uuid',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Id tidak valid',
-                'id' => $request->id,
-                'errors' => $validator->errors(),
-            ], 400);
-        }
+        // if ($validator->fails()) {
+        //     return response()->json([
+        //         'message' => 'Id tidak valid',
+        //         'id' => $request->id,
+        //         'errors' => $validator->errors(),
+        //     ], 400);
+        // }
 
         $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $request->id)->first();
 
