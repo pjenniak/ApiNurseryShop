@@ -14,6 +14,8 @@ use App\Models\Produk;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Barryvdh\DomPDF\Facade\Pdf; // Tambahkan ini di atas
+
 
 class LaporanController extends Controller
 {
@@ -38,70 +40,22 @@ class LaporanController extends Controller
 
         $pesanans = $pesananQuery->get();
 
-        $nomor = 1;
         foreach ($pesanans as $pesanan) {
-            $pesanan->nomor = $nomor;
-            $nomor++;
+            $produkData = [];
+            foreach ($pesanan->item_pesanan as $item) {
+                $produkData[] =
+                    ($item->produk->nama_produk ?? '-') . ' x ' .
+                    ($item->jumlah_barang ?? '0') .
+                    ' (@' . number_format($item->harga_per_barang ?? 0, 0, ',', '.') . ')';
+            }
+            $pesanan->produk_data = implode('<br>', $produkData);
         }
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        $pdf = Pdf::loadView('laporan.penjualan_pdf', [
+            'pesanans' => $pesanans,
+        ])->setPaper('A4', 'landscape');
 
-        $sheet->setCellValue('A1', 'No');
-        $sheet->setCellValue('B1', 'ID Pesanan');
-        $sheet->setCellValue('C1', 'Pelanggan');
-        $sheet->setCellValue('D1', 'Metode Pembayaran');
-        $sheet->setCellValue('E1', 'Produk');
-        $sheet->setCellValue('F1', 'Subtotal');
-        $sheet->setCellValue('G1', 'Diskon');
-        $sheet->setCellValue('H1', 'Pajak');
-        $sheet->setCellValue('I1', 'Total');
-        $sheet->setCellValue('J1', 'Tanggal');
-
-        $row = 2;
-
-        foreach ($pesanans as $pesanan) {
-            $sheet->setCellValue('A' . $row, $pesanan->nomor);
-            $sheet->setCellValue('B' . $row, $pesanan->pesanan_id);
-            $sheet->setCellValue('C' . $row, $pesanan->pelanggan ? $pesanan->pelanggan->nama_pelanggan . ' (' . $pesanan->pelanggan->kode_pelanggan . ')' : '-');
-            $sheet->setCellValue('D' . $row, $pesanan->transaksi ? $pesanan->transaksi->metode_pembayaran : '-');
-
-            $produkData = $pesanan->item_pesanan->map(function ($item) {
-                return $item->produk->nama_produk . ' x ' . $item->jumlah_produk . ' (@' . number_format($item->harga_per_barang, 0, ',', '.') . ')';
-            })->join(', ');
-            $sheet->setCellValue('E' . $row, $produkData);
-
-            $sheet->setCellValue('F' . $row, $pesanan->total_harga_barang);
-            $sheet->setCellValue('G' . $row, $pesanan->diskon_dikenakan . ' (' . $pesanan->persentase_diskon . '%)');
-            $sheet->setCellValue('H' . $row, $pesanan->pajak_dikenakan . ' (' . $pesanan->persentase_pajak . '%)');
-            $sheet->setCellValue('I' . $row, $pesanan->total_akhir);
-            $sheet->setCellValue('J' . $row, date('d-m-Y H:i:s', strtotime($pesanan->created_at)));
-
-            $row++;
-        }
-
-        $styleArrayFirstRow = [
-            'font' => [
-                'bold' => true,
-            ]
-        ];
-
-        $highestColumn = $sheet->getHighestColumn();
-
-        foreach (range('A', $highestColumn) as $column) {
-            $sheet->getStyle($column . '1')->applyFromArray($styleArrayFirstRow);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $response = new StreamedResponse(function () use ($writer) {
-            $writer->save('php://output');
-        });
-
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->headers->set('Content-Disposition', 'attachment; filename="Laporan Penjualan ' . env('APP_NAME') . '.xlsx"');
-        $response->headers->set('Cache-Control', 'no-cache');
-
-        return $response;
+        return $pdf->stream('Laporan Penjualan ' . env('APP_NAME') . '.pdf');
     }
 
     public function laporanPembelian(Request $request)
@@ -125,62 +79,22 @@ class LaporanController extends Controller
         $pembelianProduks = $pembelianQuery->get();
 
         $nomor = 1;
-        foreach ($pembelianProduks as $pembelian) {
-            $pembelian->nomor = $nomor;
-            $nomor++;
-        }
-
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-
-        $sheet->setCellValue('A1', 'No');
-        $sheet->setCellValue('B1', 'ID Pembelian');
-        $sheet->setCellValue('C1', 'Produk');
-        $sheet->setCellValue('D1', 'Pemasok');
-        $sheet->setCellValue('E1', 'Jumlah');
-        $sheet->setCellValue('F1', 'Harga');
-        $sheet->setCellValue('G1', 'Total');
-        $sheet->setCellValue('H1', 'Deskripsi');
-        $sheet->setCellValue('I1', 'Tanggal');
-
-        $row = 2;
-
         foreach ($pembelianProduks as $item) {
-            $sheet->setCellValue('A' . $row, $item->nomor);
-            $sheet->setCellValue('B' . $row, $item->pembelian_produk_id);
-            $sheet->setCellValue('C' . $row, $item->produk->nama_produk);
-            $sheet->setCellValue('D' . $row, $item->pemasok->nama_pemasok);
-            $sheet->setCellValue('E' . $row, $item->jumlah_pembelian);
-            $sheet->setCellValue('F' . $row, $item->harga_per_barang);
-            $sheet->setCellValue('G' . $row, $item->total_harga);
-            $sheet->setCellValue('H' . $row, $item->deskripsi_pembelian);
-            $sheet->setCellValue('I' . $row, date('d-m-Y H:i:s', strtotime($item->created_at)));
-
-            $row++;
+            $item->nomor = $nomor++;
+            $item->produk_nama = $item->produk->nama_produk ?? '-';
+            $item->pemasok_nama = $item->pemasok->nama_pemasok ?? '-';
+            $item->jumlah = $item->jumlah_pembelian ?? 0;
+            $item->harga = number_format($item->harga_per_barang ?? 0, 0, ',', '.');
+            $item->total = number_format($item->total_harga ?? 0, 0, ',', '.');
+            $item->deskripsi = $item->deskripsi_pembelian ?? '-';
+            $item->tanggal = \Carbon\Carbon::parse($item->created_at)->format('d-m-Y H:i:s');
         }
 
-        $styleArrayFirstRow = [
-            'font' => [
-                'bold' => true,
-            ]
-        ];
+        $pdf = Pdf::loadView('laporan.pembelian_pdf', [
+            'pembelianProduks' => $pembelianProduks,
+        ])->setPaper('A4', 'landscape');
 
-        $highestColumn = $sheet->getHighestColumn();
-
-        foreach (range('A', $highestColumn) as $column) {
-            $sheet->getStyle($column . '1')->applyFromArray($styleArrayFirstRow);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $response = new StreamedResponse(function () use ($writer) {
-            $writer->save('php://output');
-        });
-
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->headers->set('Content-Disposition', 'attachment; filename="Laporan Pembelian ' . env('APP_NAME') . '.xlsx"');
-        $response->headers->set('Cache-Control', 'no-cache');
-
-        return $response;
+        return $pdf->stream('Laporan Pembelian ' . env('APP_NAME') . '.pdf');
     }
 
     public function laporanKerusakan(Request $request)
@@ -204,56 +118,20 @@ class LaporanController extends Controller
         $cacatProduks = $cacatProdukQuery->get();
 
         $nomor = 1;
-        foreach ($cacatProduks as $cacatProduk) {
-            $cacatProduk->nomor = $nomor;
-            $nomor++;
-        }
-
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-
-        $sheet->setCellValue('A1', 'No');
-        $sheet->setCellValue('B1', 'ID Kerusakan');
-        $sheet->setCellValue('C1', 'Produk');
-        $sheet->setCellValue('D1', 'Jumlah');
-        $sheet->setCellValue('E1', 'Alasan');
-        $sheet->setCellValue('F1', 'Tanggal');
-
-        $row = 2;
-
         foreach ($cacatProduks as $item) {
-            $sheet->setCellValue('A' . $row, $item->nomor);
-            $sheet->setCellValue('B' . $row, $item->cacat_produk_id);
-            $sheet->setCellValue('C' . $row, $item->produk->nama_produk);
-            $sheet->setCellValue('D' . $row, $item->jumlah_produk);
-            $sheet->setCellValue('E' . $row, $item->alasan_kerusakan);
-            $sheet->setCellValue('F' . $row, date('d-m-Y H:i:s', strtotime($item->created_at)));
-
-            $row++;
+            $item->nomor   = $nomor++;
+            $item->id_kerusakan = $item->cacat_produk_id ?? '-';
+            $item->produk_nama  = $item->produk->nama_produk ?? '-';
+            $item->jumlah       = $item->jumlah_produk ?? 0;
+            $item->alasan       = $item->alasan_kerusakan ?? '-';
+            $item->tanggal      = \Carbon\Carbon::parse($item->created_at)->format('d-m-Y H:i:s');
         }
 
-        $styleArrayFirstRow = [
-            'font' => [
-                'bold' => true,
-            ]
-        ];
+        $pdf = Pdf::loadView('laporan.kerusakan_pdf', [
+            'cacatProduks' => $cacatProduks,
+        ])->setPaper('A4', 'landscape');
 
-        $highestColumn = $sheet->getHighestColumn();
-
-        foreach (range('A', $highestColumn) as $column) {
-            $sheet->getStyle($column . '1')->applyFromArray($styleArrayFirstRow);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $response = new StreamedResponse(function () use ($writer) {
-            $writer->save('php://output'); // Stream directly to the browser
-        });
-
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->headers->set('Content-Disposition', 'attachment; filename="Laporan Kerusakan ' . env('APP_NAME') . '.xlsx"');
-        $response->headers->set('Cache-Control', 'no-cache');
-
-        return $response;
+        return $pdf->stream('Laporan Kerusakan ' . env('APP_NAME') . '.pdf');
     }
 
     public function laporanProduk(Request $request)
@@ -267,186 +145,77 @@ class LaporanController extends Controller
         foreach ($produks as $produk) {
             $produk->total_terjual = $items_pesanan->where('produk_id', $produk->produk_id)->sum('jumlah_barang');
             $produk->total_cacat = $cacats->where('produk_id', $produk->produk_id)->sum('jumlah_produk');
-            $produk->total_pembelian = $pembelians->where('produk_id', $produk->id)->sum('jumlah_pembelian');
-            $produk->nomor = $nomor;
-            $nomor++;
+            $produk->total_pembelian = $pembelians->where('produk_id', $produk->produk_id)->sum('jumlah_pembelian');
+            $produk->nomor = $nomor++;
+
+            $produk->kategori = $produk->kategori_produk ?? '-';
+            $produk->harga = number_format($produk->harga_produk ?? 0, 0, ',', '.');
+            $produk->hpp = number_format($produk->hpp ?? 0, 0, ',', '.');
+            $produk->stok = $produk->jumlah_stok ?? 0;
+            $produk->terjual = $produk->total_terjual ?? 0;
+            $produk->pembelian = $produk->total_pembelian ?? 0;
+            $produk->kerusakan = $produk->total_cacat ?? 0;
+            $produk->deskripsi = $produk->deskripsi_produk ?: '-';
+            $produk->tanggal = \Carbon\Carbon::parse($produk->created_at)->format('d-m-Y H:i:s');
         }
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        $pdf = Pdf::loadView('laporan.produk_pdf', [
+            'produks' => $produks,
+        ])->setPaper('A4', 'landscape');
 
-        $sheet->setCellValue('A1', 'No');
-        $sheet->setCellValue('B1', 'ID Produk');
-        $sheet->setCellValue('C1', 'Nama');
-        $sheet->setCellValue('D1', 'Kategori');
-        $sheet->setCellValue('E1', 'Harga');
-        $sheet->setCellValue('F1', 'Harga Rata-Rata Pembelian');
-        $sheet->setCellValue('G1', 'Stok');
-        $sheet->setCellValue('H1', 'Terjual');
-        $sheet->setCellValue('I1', 'Pembelian');
-        $sheet->setCellValue('J1', 'Kerusakan');
-        $sheet->setCellValue('K1', 'Deskripsi');
-        $sheet->setCellValue('L1', 'Terdaftar Pada');
-
-        $row = 2;
-
-        foreach ($produks as $item) {
-            $sheet->setCellValue('A' . $row, $item->nomor);
-            $sheet->setCellValue('B' . $row, $item->produk_id);
-            $sheet->setCellValue('C' . $row, $item->nama_produk);
-            $sheet->setCellValue('D' . $row, $item->kategori_produk);
-            $sheet->setCellValue('E' . $row, $item->harga_produk);
-            $sheet->setCellValue('F' . $row, $item->hpp);
-            $sheet->setCellValue('G' . $row, $item->jumlah_stok);
-            $sheet->setCellValue('H' . $row, $item->total_terjual);
-            $sheet->setCellValue('I' . $row, $item->total_pembelian);
-            $sheet->setCellValue('J' . $row, $item->total_cacat);
-            $sheet->setCellValue('K' . $row, $item->deskripsi_produk ?: '-');
-            $sheet->setCellValue('L' . $row, date('d-m-Y H:i:s', strtotime($item->created_at)));
-
-            $row++;
-        }
-
-        $styleArrayFirstRow = [
-            'font' => [
-                'bold' => true,
-            ]
-        ];
-
-        $highestColumn = $sheet->getHighestColumn();
-
-        foreach (range('A', $highestColumn) as $column) {
-            $sheet->getStyle($column . '1')->applyFromArray($styleArrayFirstRow);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $response = new StreamedResponse(function () use ($writer) {
-            $writer->save('php://output');
-        });
-
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->headers->set('Content-Disposition', 'attachment; filename="Laporan Produk ' . env('APP_NAME') . '.xlsx"');
-        $response->headers->set('Cache-Control', 'no-cache');
-
-        return $response;
+        return $pdf->stream('Laporan Produk ' . env('APP_NAME') . '.pdf');
     }
+
 
     public function laporanPelanggan(Request $request)
     {
-
-        $pelanggans = Pelanggan::withCount(["pesanan"])->where('is_deleted', false)->get();
+        $pelanggans = Pelanggan::withCount(["pesanan"])
+            ->where('is_deleted', false)
+            ->get();
 
         $nomor = 1;
         foreach ($pelanggans as $pelanggan) {
-            $pelanggan->nomor = $nomor;
-            $nomor++;
+            $pelanggan->nomor = $nomor++;
+            $pelanggan->id_pelanggan = $pelanggan->pelanggan_id ?? '-';
+            $pelanggan->nama = $pelanggan->nama_pelanggan ?? '-';
+            $pelanggan->tipe = $pelanggan->jenis_kode ?? '-';
+            $pelanggan->kontak = $pelanggan->kode_pelanggan ?? '-';
+            $pelanggan->total_pesanan = $pelanggan->pesanan_count ?? 0;
+            $pelanggan->terdaftar = \Carbon\Carbon::parse($pelanggan->created_at)->format('d-m-Y H:i:s');
         }
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        $pdf = Pdf::loadView('laporan.pelanggan_pdf', [
+            'pelanggans' => $pelanggans,
+        ])->setPaper('A4', 'landscape');
 
-        $sheet->setCellValue('A1', 'No');
-        $sheet->setCellValue('B1', 'ID Pelanggan');
-        $sheet->setCellValue('C1', 'Nama');
-        $sheet->setCellValue('D1', 'Tipe');
-        $sheet->setCellValue('E1', 'Kontak');
-        $sheet->setCellValue('F1', 'Total Pesanan');
-        $sheet->setCellValue('G1', 'Terdaftar Pada');
-
-        $row = 2;
-
-        foreach ($pelanggans as $item) {
-            $sheet->setCellValue('A' . $row, $item->nomor);
-            $sheet->setCellValue('B' . $row, $item->pelanggan_id);
-            $sheet->setCellValue('C' . $row, $item->nama_pelanggan);
-            $sheet->setCellValue('D' . $row, $item->jenis_kode);
-            $sheet->setCellValue('E' . $row, $item->kode_pelanggan);
-            $sheet->setCellValue('F' . $row, $item->pesanan_count);
-            $sheet->setCellValue('G' . $row, date('d-m-Y H:i:s', strtotime($item->created_at)));
-
-            $row++;
-        }
-
-        $styleArrayFirstRow = [
-            'font' => [
-                'bold' => true,
-            ]
-        ];
-
-        $highestColumn = $sheet->getHighestColumn();
-
-        foreach (range('A', $highestColumn) as $column) {
-            $sheet->getStyle($column . '1')->applyFromArray($styleArrayFirstRow);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $response = new StreamedResponse(function () use ($writer) {
-            $writer->save('php://output');
-        });
-
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->headers->set('Content-Disposition', 'attachment; filename="Laporan Pelanggan ' . env('APP_NAME') . '.xlsx"');
-        $response->headers->set('Cache-Control', 'no-cache');
-
-        return $response;
+        return $pdf->stream('Laporan Pelanggan ' . env('APP_NAME') . '.pdf');
     }
+
+
 
     public function laporanPemasok(Request $request)
     {
-        $pemasoks = Pemasok::withCount(["pembelian_produk"])->where('is_deleted', false)->get();
+        $pemasoks = Pemasok::withCount(['pembelian_produk'])
+            ->where('is_deleted', false)
+            ->get();
 
         $nomor = 1;
         foreach ($pemasoks as $pemasok) {
-            $pemasok->nomor = $nomor;
-            $nomor++;
+            $pemasok->nomor           = $nomor++;
+            $pemasok->id_pemasok      = $pemasok->pemasok_id ?? '-';
+            $pemasok->nama            = $pemasok->nama_pemasok ?? '-';
+            $pemasok->kontak          = $pemasok->telepon_pemasok ?? '-';
+            $pemasok->total_pesanan   = $pemasok->pembelian_produk_count ?? 0;
+            $pemasok->terdaftar       = \Carbon\Carbon::parse($pemasok->created_at)->format('d-m-Y H:i:s');
         }
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        $pdf = Pdf::loadView('laporan.pemasok_pdf', [
+            'pemasoks' => $pemasoks,
+        ])->setPaper('A4', 'landscape');
 
-        $sheet->setCellValue('A1', 'No');
-        $sheet->setCellValue('B1', 'ID Pemasok');
-        $sheet->setCellValue('C1', 'Nama');
-        $sheet->setCellValue('D1', 'Kontak');
-        $sheet->setCellValue('E1', 'Total Pesanan');
-        $sheet->setCellValue('F1', 'Terdaftar Pada');
-
-        $row = 2;
-
-        foreach ($pemasoks as $item) {
-            $sheet->setCellValue('A' . $row, $item->nomor);
-            $sheet->setCellValue('B' . $row, $item->pemasok_id);
-            $sheet->setCellValue('C' . $row, $item->nama_pemasok);
-            $sheet->setCellValue('D' . $row, $item->telepon_pemasok);
-            $sheet->setCellValue('E' . $row, $item->pembelian_produk_count);
-            $sheet->setCellValue('F' . $row, date('d-m-Y H:i:s', strtotime($item->created_at)));
-
-            $row++;
-        }
-
-        $styleArrayFirstRow = [
-            'font' => [
-                'bold' => true,
-            ]
-        ];
-
-        $highestColumn = $sheet->getHighestColumn();
-
-        foreach (range('A', $highestColumn) as $column) {
-            $sheet->getStyle($column . '1')->applyFromArray($styleArrayFirstRow);
-        }
-
-        $writer = new Xlsx($spreadsheet);
-        $response = new StreamedResponse(function () use ($writer) {
-            $writer->save('php://output');
-        });
-
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->headers->set('Content-Disposition', 'attachment; filename="Laporan Pemasok ' . env('APP_NAME') . '.xlsx"');
-        $response->headers->set('Cache-Control', 'no-cache');
-
-        return $response;
+        return $pdf->stream('Laporan Pemasok ' . env('APP_NAME') . '.pdf');
     }
+
 
     public function index(Request $request)
     {
