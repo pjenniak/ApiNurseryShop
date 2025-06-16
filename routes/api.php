@@ -37,6 +37,7 @@ Route::group(['prefix' => 'laporan'], function () {
 });
 
 Route::get('/ringkasan', [RingkasanController::class, 'index']);
+Route::get('/pesanan/{id}/nota', [PesananController::class, 'cetakNota']);
 
 Route::group(['middleware' => ['jwt.auth']], function () {
     Route::get('produk', [ProdukController::class, 'index']);
@@ -44,7 +45,7 @@ Route::group(['middleware' => ['jwt.auth']], function () {
     Route::get('produk/{id}', [ProdukController::class, 'show']);
     Route::put('produk/{id}', [ProdukController::class, 'update']);
     Route::delete('produk/{id}', [ProdukController::class, 'destroy']);
-    
+
     Route::apiResource('pemasok', PemasokController::class);
     Route::apiResource('pelanggan', PelangganController::class);
     Route::apiResource('informasi', InformasiController::class);
@@ -58,6 +59,7 @@ Route::group(['middleware' => ['jwt.auth']], function () {
         Route::get('/', [PesananController::class, 'index']);
         Route::post('/', [PesananController::class, 'store']);
         Route::get('/{id}', [PesananController::class, 'show']);
+        Route::post('/cancel', [PesananController::class, 'cancel']);
         Route::post('/nota', [PesananController::class, 'kirimNota']);
         Route::post('/notifikasi', [PesananController::class, 'webhook']);
     });

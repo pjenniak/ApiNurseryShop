@@ -10,6 +10,7 @@ use App\Models\ItemPesanan;
 use App\Models\Pelanggan;
 use App\Models\Pesanan;
 use App\Models\Produk;
+use App\Models\Transaksi;
 use App\Services\LogService;
 use Exception;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Validator;
 use Midtrans\Config;
 use Midtrans\Snap;
 use Midtrans\Transaction as MidtransTransaction;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class PesananController extends Controller
 {
@@ -446,6 +448,116 @@ class PesananController extends Controller
 
         return response()->json([
             'message' => 'Berhasil mengirim nota ke ' . $to . ' pelanggan',
+            'data' => $pesanan
+        ]);
+    }
+
+    public function cetakNota(Request $request)
+    {
+        // $validator = Validator::make($request->all(), [
+        //     'id' => 'required|uuid',
+        // ]);
+
+        // if ($validator->fails()) {
+        //     return response()->json([
+        //         'message' => 'Id tidak valid',
+        //         'id' => $request->id,
+        //         'errors' => $validator->errors(),
+        //     ], 400);
+        // }
+
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])
+            ->where('pesanan_id', $request->id)
+            ->first();
+
+        if (!$pesanan) {
+            return response()->json([
+                'message' => 'Data tidak ditemukan',
+            ], 404);
+        }
+
+        if ($pesanan->status == "Pending") {
+            return response()->json([
+                'message' => 'Pesanan belum dibayar',
+            ], 400);
+        }
+
+
+        $nota = [
+            'pesanan_id'        => $pesanan->pesanan_id,
+            'tanggal'           => $pesanan->created_at,
+            'persentase_diskon' => $pesanan->persentase_diskon,
+            'diskon'            => $pesanan->diskon_dikenakan,
+            'persentase_pajak'  => $pesanan->persentase_pajak,
+            'pajak'             => $pesanan->pajak_dikenakan,
+            'total_akhir'       => $pesanan->total_akhir
+        ];
+
+        $item_nota = [];
+        foreach ($pesanan->item_pesanan as $item) {
+            $item_nota[] = [
+                'produk' => $item->produk->nama_produk,
+                'jumlah' => $item->jumlah_barang,
+                'harga'  => $item->harga_per_barang,
+                'total'  => $item->total_harga,
+            ];
+        }
+
+        // Langsung tampilkan PDF (tidak ada kirim email/WA)
+        $pdf = Pdf::loadView('emails.nota_pesanan', [
+            'nota'      => $nota,
+            'item_nota' => $item_nota,
+        ])->setPaper('A4');
+
+        return $pdf->stream('Nota Pesanan - ' . $nota['pesanan_id'] . '.pdf');
+    }
+
+    public function cancel(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'id' => 'required|uuid',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Id tidak valid',
+                'id' => $request->id,
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $request->id)->first();
+
+        if (!$pesanan) {
+            return response()->json([
+                'message' => 'Data tidak ditemukan',
+            ], 404);
+        }
+
+        if ($pesanan->transaksi->status_pembayaran != "Pending") {
+            return response()->json([
+                'message' => 'Pesanan sudah selesai',
+            ], 400);
+        }
+
+        $produks = Produk::all();
+
+        foreach ($pesanan->item_pesanan as $item) {
+            $jumlah_barang = $item->jumlah_barang;
+            $produk = $produks->where('produk_id', $item->produk_id)->first();
+            if ($produk) {
+                $produk->jumlah_stok += $jumlah_barang;
+                $produk->save();
+            }
+        }
+
+        Transaksi::where('transaksi_id', $pesanan->transaksi->transaksi_id)
+            ->update([
+                'status_pembayaran' => 'Cancelled',
+            ]);
+
+        return response()->json([
+            'message' => 'Pesanan berhasil dibatalkan',
             'data' => $pesanan
         ]);
     }

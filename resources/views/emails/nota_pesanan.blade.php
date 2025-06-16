@@ -77,6 +77,12 @@
                 border-radius: 5px;
             }
         }
+
+        .align-left {
+            text-align: left;
+            align-self: flex-start;
+            margin-left: 0;
+        }
     </style>
 </head>
 
@@ -88,6 +94,7 @@
             </div>
             <div class="email-body">
                 <h1>Nota Pesanan</h1>
+                <p class="align-left"><strong>Tanggal Pesanan:</strong> {{ \Carbon\Carbon::parse($nota['tanggal'])->format('d F Y') }}</p> <!-- Tanggal Pesanan -->
                 <div class="email-text">
                     <h3>Item Pesanan</h3>
                     <table style="width: 100%; margin-top: 10px; border-collapse: collapse; text-align: left;">
@@ -106,11 +113,9 @@
                         </tr>
                         @endforeach
                     </table>
-                    <p><strong>Tanggal Pesanan:</strong> {{ \Carbon\Carbon::parse($nota['tanggal'])->format('d F Y') }}</p> <!-- Tanggal Pesanan -->
                     <p>Berikut adalah informasi pesanan Anda:</p>
                     <table style="width: 100%; margin-top: 20px; border-collapse: collapse; text-align: left;">
                         <tr>
-                            <th>Pesanan ID</th>
                             <th>Diskon (%)</th>
                             <th>Diskon (Rp)</th>
                             <th>Pajak (%)</th>
@@ -118,7 +123,6 @@
                             <th>Total Akhir (Rp)</th>
                         </tr>
                         <tr>
-                            <td>{{ $nota['pesanan_id'] }}</td>
                             <td>{{ $nota['persentase_diskon'] }}%</td>
                             <td>{{ number_format($nota['diskon'], 0, ',', '.') }}</td>
                             <td>{{ $nota['persentase_pajak'] }}%</td>

@@ -44,12 +44,11 @@ class WhatsAppController extends Controller
         $appName = env('APP_NAME');
         $apiKey = env('FONNTE_API_KEY');
 
-        $title = "*Nota Pesanan - {$nota['pesanan_id']}*";
+        $title = "*Nota Pesanan - $appName*";
         $tanggal = "*Tanggal Pesanan:* " . \Carbon\Carbon::parse($nota['tanggal'])->format('d F Y');
         $sub = 'Berikut adalah informasi pesanan Anda:';
 
-        $detail_nota = "*Pesanan ID*: {$nota['pesanan_id']}\n"
-            . "*Diskon (%)*: {$nota['persentase_diskon']}%\n"
+        $detail_nota = "*Diskon (%)*: {$nota['persentase_diskon']}%\n"
             . "*Diskon (Rp)*: " . number_format($nota['diskon'], 0, ',', '.') . "\n"
             . "*Pajak (%)*: {$nota['persentase_pajak']}%\n"
             . "*Pajak (Rp)*: " . number_format($nota['pajak'], 0, ',', '.') . "\n"
@@ -65,7 +64,7 @@ class WhatsAppController extends Controller
 
         $closure = "Terima kasih telah bergabung dengan kami di *{$appName}*! Kami sangat senang Anda memilih layanan kami.";
 
-        $fullMessage = $title . "\n\n" . $tanggal . "\n\n" . $sub . "\n\n" . $detail_nota . "\n\n" . $detail_item_nota . "\n\n" . $closure;
+        $fullMessage = $title . "\n\n" . $tanggal . "\n\n" . $sub . "\n\n" . $detail_item_nota . "\n\n" . $detail_nota . "\n\n" . $closure;
 
 
         // Kirim permintaan ke WhatsApp API menggunakan HTTP dengan Authorization
