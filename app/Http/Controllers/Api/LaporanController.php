@@ -24,7 +24,7 @@ class LaporanController extends Controller
 
         $pesananQuery = Pesanan::query()
             ->where('is_deleted', false)
-            ->with(['transaksi', 'item_pesanan.produk', 'pelanggan'])
+            ->with(['item_pesanan.produk', 'pelanggan'])
             ->select('pesanan.*');
 
         if ($start) {

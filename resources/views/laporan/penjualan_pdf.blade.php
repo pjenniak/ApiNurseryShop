@@ -46,7 +46,7 @@
                         -
                     @endif
                 </td>
-                <td>{{ $pesanan->transaksi ? $pesanan->transaksi->metode_pembayaran : '-' }}</td>
+                <td>{{ $pesanan->metode_pembayaran ? $pesanan->metode_pembayaran : '-' }}</td>
                 <td>{!! $pesanan->produk_data !!}</td>
                 <td>Rp {{ $pesanan->total_harga_barang }}</td>
                 <td>Rp {{ $pesanan->diskon_dikenakan }} ({{ $pesanan->persentase_diskon }}%)</td>

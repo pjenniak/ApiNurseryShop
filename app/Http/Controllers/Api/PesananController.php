@@ -6,15 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\WhatsAppController;
 use App\Mail\EmailNotaPesanan;
 use App\Models\Informasi;
-use App\Models\ItemPesanan;
 use App\Models\Pelanggan;
 use App\Models\Pesanan;
 use App\Models\Produk;
-use App\Models\Transaksi;
 use App\Services\LogService;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Midtrans\Config;
@@ -33,7 +30,7 @@ class PesananController extends Controller
 
     public function index()
     {
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->orderBy('created_at', 'desc')->get();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", 'pelanggan'])->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'message' => 'OK',
@@ -195,7 +192,10 @@ class PesananController extends Controller
                 'pajak_dikenakan' => $pajak,
                 'persentase_diskon' => $informasi->persentase_diskon,
                 'persentase_pajak' => $informasi->persentase_pajak,
-                'pelanggan_id' => $pelanggan_id
+                'pelanggan_id' => $pelanggan_id,
+                'metode_pembayaran' => $validated['metode'],
+                'status' => $validated['metode'] === "Cash" ? "Success" : "Pending",
+                'detail_transaksi' => null,
             ]);
 
             $pesanan->item_pesanan()->createMany($filtered_item_pesanan);
@@ -206,14 +206,7 @@ class PesananController extends Controller
                 ]);
             }
 
-            if ($validated['metode'] === "Cash") {
-                $pesanan->transaksi()->create([
-                    'metode_pembayaran' => 'Cash',
-                    'status_pembayaran' => "Success",
-                    'jumlah_pembayaran' => $total_akhir,
-                    'detail_transaksi' => null,
-                ]);
-            } else {
+            if ($validated['metode'] === "VirtualAccountOrBank") {
                 $transactionDetails = [
                     'order_id' => $pesanan->pesanan_id,
                     'gross_amount' => $total_akhir,
@@ -232,16 +225,15 @@ class PesananController extends Controller
                 } catch (Exception $e) {
                 }
 
-                $pesanan->transaksi()->create([
+                $pesanan->update([
                     'metode_pembayaran' => 'VirtualAccountOrBank',
                     'status_pembayaran' => "Pending",
-                    'jumlah_pembayaran' => $total_akhir,
                     'detail_transaksi' => $status ? json_encode($status) : null,
                     'midtrans_snap_token' => $snap_token,
                     'midtrans_url_redirect' => $url_redirect
                 ]);
             }
-            $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $pesanan->pesanan_id)->first();
+            $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", 'pelanggan'])->where('pesanan_id', $pesanan->pesanan_id)->first();
             $this->logService->saveToLog($request, 'Pesanan', $pesanan->toArray());
 
             $nota = [
@@ -308,7 +300,7 @@ class PesananController extends Controller
             ], 400);
         }
 
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $id)->first();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", 'pelanggan'])->where('pesanan_id', $id)->first();
 
         if (!$pesanan) {
             return response()->json([
@@ -328,9 +320,9 @@ class PesananController extends Controller
             //     'status' => (array) $status,
             // ]);
             $arrStatus = (array) $status;
-            if ($pesanan->transaksi->status_pembayaran == "Pending" && isset($status->transaction_status) && $arrStatus["transaction_status"] == "settlement") {
+            if ($pesanan->status_pembayaran == "Pending" && isset($status->transaction_status) && $arrStatus["transaction_status"] == "settlement") {
                 // DEBUG
-                $pesanan->transaksi()->update([
+                $pesanan->update([
                     'status_pembayaran' => "Success",
                     'detail_transaksi' => json_encode($status)
                 ]);
@@ -369,7 +361,7 @@ class PesananController extends Controller
             }
         } catch (Exception $e) {
         }
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $id)->first();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", 'pelanggan'])->where('pesanan_id', $id)->first();
         return response()->json([
             'message' => 'OK',
             'data' => $pesanan
@@ -392,7 +384,7 @@ class PesananController extends Controller
             ], 400);
         }
 
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $request->id)->first();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", 'pelanggan'])->where('pesanan_id', $request->id)->first();
         if (!$pesanan) {
             return response()->json([
                 'message' => 'Data tidak ditemukan',
@@ -466,7 +458,7 @@ class PesananController extends Controller
         //     ], 400);
         // }
 
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk",  'pelanggan'])
             ->where('pesanan_id', $request->id)
             ->first();
 
@@ -476,7 +468,7 @@ class PesananController extends Controller
             ], 404);
         }
 
-        if ($pesanan->status == "Pending") {
+        if ($pesanan->status_pembayaran == "Pending") {
             return response()->json([
                 'message' => 'Pesanan belum dibayar',
             ], 400);
@@ -526,7 +518,7 @@ class PesananController extends Controller
         //     ], 400);
         // }
 
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $request->id)->first();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk",  'pelanggan'])->where('pesanan_id', $request->id)->first();
 
         if (!$pesanan) {
             return response()->json([
@@ -534,7 +526,7 @@ class PesananController extends Controller
             ], 404);
         }
 
-        if ($pesanan->transaksi->status_pembayaran != "Pending") {
+        if ($pesanan->status_pembayaran != "Pending") {
             return response()->json([
                 'message' => 'Pesanan sudah selesai',
             ], 400);
@@ -551,7 +543,7 @@ class PesananController extends Controller
             }
         }
 
-        Transaksi::where('transaksi_id', $pesanan->transaksi->transaksi_id)
+        Pesanan::where('pesanan_id', $request->id)
             ->update([
                 'status_pembayaran' => 'Cancelled',
             ]);
@@ -570,7 +562,7 @@ class PesananController extends Controller
             'fraud_status' => 'required|string',
         ]);
 
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $request->order_id)->first();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk",  'pelanggan'])->where('pesanan_id', $request->order_id)->first();
 
         if (!$pesanan) {
             return response()->json([
@@ -582,7 +574,7 @@ class PesananController extends Controller
             ($request->transaction_status == "capture" && $request->fraud_status == "accept") ||
             $request->transaction_status == "settlement"
         ) {
-            $pesanan->transaksi()->update([
+            $pesanan->update([
                 'status_pembayaran' => "Success",
                 'detail_transaksi' => json_encode($request->all())
             ]);
@@ -621,7 +613,7 @@ class PesananController extends Controller
             }
         }
 
-        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk", "transaksi", 'pelanggan'])->where('pesanan_id', $request->order_id)->first();
+        $pesanan = Pesanan::with(["item_pesanan", "item_pesanan.produk",  'pelanggan'])->where('pesanan_id', $request->order_id)->first();
 
         return response()->json([
             'message' => 'OK',
