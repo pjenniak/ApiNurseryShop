@@ -22,6 +22,9 @@ class Pesanan extends Model
         'persentase_diskon' => 'float',
         'persentase_pajak' => 'float',
         'is_deleted' => 'boolean',
+
+        // fields for transactions
+        'detail_transaksi' => 'array',
     ];
 
     protected $fillable = [
@@ -35,6 +38,13 @@ class Pesanan extends Model
         'persentase_diskon',
         'persentase_pajak',
         'is_deleted',
+
+        // fields for transactions
+        'metode_pembayaran',
+        'status_pembayaran',
+        'detail_transaksi',
+        'midtrans_snap_token',
+        'midtrans_url_redirect',
     ];
 
     protected static function booted()
@@ -54,10 +64,5 @@ class Pesanan extends Model
     public function item_pesanan()
     {
         return $this->hasMany(ItemPesanan::class, 'pesanan_id', 'pesanan_id');
-    }
-
-    public function transaksi()
-    {
-        return $this->hasOne(Transaksi::class, 'pesanan_id', 'pesanan_id');
     }
 }
